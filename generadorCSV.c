@@ -122,6 +122,31 @@ for(int i=0; i<5; i++) {
 printf("Total de encuestas: %d\n", total);
 
 
+char nombreArchivo[100];
+
+snprintf(nombreArchivo, sizeof(nombreArchivo),
+ "encuestas_%s_%.2f.csv", pais);
+
+FILE *archivo = fopen(nombreArchivo, "w");
+
+if (archivo == NULL) {
+    printf("Error: no se pudo crear el archivo %s\n", nombreArchivo);
+    return 1;
+}
+
+if(fprintf(archivo, "ID_Encuesta,ID_Pais,Pais,Sector,ID_Sector,Sentimiento\n") < 0) {
+    perror("Error al escribir la cabecera");
+    fclose(archivo);
+    return 1;
+}
+
+if(fclose(archivo) != 0) {
+    perror("Error al cerrar el archivo");
+    return 1;
+}
+
+printf("Archivo %s creado exitosamente\n", nombreArchivo);
+
     return 0;
 }
 
