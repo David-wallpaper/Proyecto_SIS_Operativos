@@ -85,5 +85,43 @@ if (porcentaje < 0 || porcentaje > 100) {
     printf("Pais seleccionado: %s\n", pais);
     printf("Porcentaje seleccionado: %.2f%%\n", porcentaje);
 
+const char *sectores[5] = {
+    "Industria", "Servicios", "Consumidores", "Comercio", "Construccion"
+};
+
+int maximos[3][5] = {
+    { 1760, 1430, 2020,1080,290}, // ES
+    { 3850, 4240, 1670, 2860, 24020 }, // FR
+    { 5440, 3100, 2000, 1560, 1000 }  // IT
+
+};
+
+int indicePais;
+
+if(strcmp(pais, "ES") == 0) {
+    indicePais = 0;
+} else if(strcmp(pais, "FR") == 0) {
+    indicePais = 1;
+} else {
+    indicePais = 2;
+ }
+
+int cantidades[5];
+int total=0;
+
+
+for(int i=0; i<5; i++) {
+    cantidades[i] = (int)(maximos[indicePais][i] * porcentaje / 100.0 + 0.5);
+
+    total+= cantidades[i];
+
+    printf("%s: %d/%d encuestras\n",
+    sectores[i], cantidades[i], maximos[indicePais][i]);        
+}
+
+printf("Total de encuestas: %d\n", total);
+
+
     return 0;
 }
+
