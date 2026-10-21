@@ -3,6 +3,7 @@
 #include <math.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <time.h>
 
 int main(int argc, char *argv[]) {
     char *pais = NULL;
@@ -138,6 +139,30 @@ if(fprintf(archivo, "ID_Encuesta,ID_Pais,Pais,Sector,ID_Sector,Sentimiento\n") <
     perror("Error al escribir la cabecera");
     fclose(archivo);
     return 1;
+}
+
+srand((unsigned int)time(NULL));
+
+int idEncuesta = 1;
+
+for (int i = 0; i < 5; ++i) {
+    for (int j = 0; j < cantidades[i]; ++j) {
+        double sentimiento = (rand() % 10001) / 100.0;
+
+        if (fprintf(archivo, "%d,%d,%s,%s,%d,%.2f\n",
+                    idEncuesta,
+                    indicePais,
+                    pais,
+                    sectores[i],
+                    i,
+                    sentimiento) < 0) {
+            perror("Error al escribir una encuesta");
+            fclose(archivo);
+            return 1;
+        }
+
+        ++idEncuesta;
+    }
 }
 
 if(fclose(archivo) != 0) {
