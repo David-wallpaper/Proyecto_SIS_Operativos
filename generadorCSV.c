@@ -126,7 +126,7 @@ printf("Total de encuestas: %d\n", total);
 char nombreArchivo[100];
 
 snprintf(nombreArchivo, sizeof(nombreArchivo),
- "encuestas_%s_%.2f.csv", pais);
+ "encuestas_%s.csv", pais);
 
 FILE *archivo = fopen(nombreArchivo, "w");
 
