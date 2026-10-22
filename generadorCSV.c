@@ -116,7 +116,7 @@ for(int i=0; i<5; i++) {
 
     total+= cantidades[i];
 
-    printf("%s: %d/%d encuestras\n",
+    printf("%s: %d/%d encuestas\n",
     sectores[i], cantidades[i], maximos[indicePais][i]);        
 }
 
@@ -131,7 +131,7 @@ snprintf(nombreArchivo, sizeof(nombreArchivo),
 FILE *archivo = fopen(nombreArchivo, "w");
 
 if (archivo == NULL) {
-    printf("Error: no se pudo crear el archivo %s\n", nombreArchivo);
+    perror("Error: no se pudo crear el archivo\n");
     return 1;
 }
 
