@@ -159,3 +159,19 @@ static int leer_configuracion(int argc, char **argv, Configuracion *config) {
 
     return 0;
 }
+
+
+int main(int argc, char **argv) {
+    Configuracion config;
+
+    if (leer_configuracion(argc, argv, &config) != 0) {
+        fprintf(stderr, "Error: configuración invalida\n");
+        mostrar_uso(argv[0]);
+        return 1;
+    }
+
+    // Aquí iría la lógica principal del servidor ISE
+    // Inicialización de agentes, creación de hilos, manejo de mensajes, etc.
+
+    return 0;
+}
