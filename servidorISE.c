@@ -170,8 +170,11 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    // Aquí iría la lógica principal del servidor ISE
-    // Inicialización de agentes, creación de hilos, manejo de mensajes, etc.
+    printf("Configuración del servidor:\n");
+    printf("Capacidad por buffer: %zu encuestas\n", config.tam_buffer);
+    printf("Nombre del FIFO: %s\n", config.pipe_nombre);
+    printf("Tiempo de ejecucion: %d segundos\n", config.segundos);
+    printf("Maximo de agentes: %d\n", config.cantidad_agentes);
 
     return 0;
 }
