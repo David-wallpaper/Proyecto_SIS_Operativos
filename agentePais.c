@@ -31,6 +31,8 @@ typedef struct {
 typedef struct {
     TipoMensaje tipo;
 
+    pid_t pid;
+
     char pais[MAX_PAIS];
 
     int totalEncuestas;
@@ -277,6 +279,7 @@ int main(int argc, char *argv[]) {
     mensaje.tipo = MENSAJE_INICIO;
 
     mensaje.totalEncuestas = totalEncuestas;
+    mensaje.pid = getpid(); //obtiene el pid del proceso actual
 
     fgets(linea, sizeof(linea), archivo);
     convertirLineaEncuesta(linea, &encuesta);
