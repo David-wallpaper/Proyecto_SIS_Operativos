@@ -317,6 +317,7 @@ int main(int argc, char *argv[]) {
         memset(&mensaje, 0, sizeof(MensajeAgente));
 
         mensaje.tipo = MENSAJE_ENCUESTA;
+        mensaje.pid = getpid();
         mensaje.encuesta = encuesta;
 
 
@@ -365,6 +366,7 @@ int main(int argc, char *argv[]) {
     mensaje.tipo = MENSAJE_FIN;
     strcpy(mensaje.pais, encuesta.pais);
     mensaje.totalEncuestas = encuestasEnviadas;
+    mensaje.pid = getpid();
 
     if (enviarMensaje(fdPipe, &mensaje) == -1) {
 
