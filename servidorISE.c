@@ -97,15 +97,6 @@ static int tiempo_terminado = 0;           // lo pone en 1 el hilo reloj cuando 
 static pthread_mutex_t mutex_tiempo = PTHREAD_MUTEX_INITIALIZER;   // protege tiempo_terminado: la escribe un hilo y la lee otro   // lo pone en 1 el hilo reloj; atomica porque la escribe un hilo y la lee otro
 static pthread_mutex_t mutex_salida = PTHREAD_MUTEX_INITIALIZER;   // para que los reportes no se impriman mezclados
 
-// Muestra la forma correcta de invocar el servidor
-static void mostrar_uso(const char *programa) {
-    fprintf(stderr, "Uso: %s -b <tamB> -p <PipeN> -t <time> -a <hilos>\n", programa);
-    fprintf(stderr, "  -b  capacidad del buffer de cada agente (registros)\n");
-    fprintf(stderr, "  -p  nombre del FIFO nominal (recomendado: TORVALDS)\n");
-    fprintf(stderr, "  -t  tiempo de ejecucion, entre 30 y 120 segundos\n");
-    fprintf(stderr, "  -a  cantidad maxima de agentes, entre 1 y 4\n");
-}
-
 // Convierte texto a int con strtol. Devuelve 0 si es valido, -1 si no
 static int convertir_entero(const char *texto, int *resultado) {
     char *fin;
@@ -518,35 +509,26 @@ static void *hilo_recolector(void *argumento) {
  
 // Al acabar el tiempo: a los agentes que no alcanzaron a enviar FIN se les
 // pone uno en el buffer para que su hilo termine; luego espera a todos
-static void esperar_agentes(void) {
+static void finalizar_servidor(const Configuracion *config) {
     for (int i = 0; i < MAX_AGENTES; ++i) {
         if (agentes[i].activo) {
-            if (!agentes[i].fin_enviado) {
+            if (!agentes[i].fin_enviado) {            // si no alcanzo a mandar FIN, se le pone uno
                 MensajeAgente fin;
                 memset(&fin, 0, sizeof(fin));
                 fin.tipo = MENSAJE_FIN;
                 buffer_insertar(&agentes[i].buffer, &fin);
                 agentes[i].fin_enviado = 1;
             }
-            pthread_join(agentes[i].hilo, NULL);
+            pthread_join(agentes[i].hilo, NULL);       // espera a que su hilo termine
+            buffer_destruir(&agentes[i].buffer);       // el buffer ya no lo usa nadie
         }
     }
-}
- 
-// Cierra y borra el FIFO y libera los buffers
-static void limpiar_recursos(const Configuracion *config) {
+
     if (fd_pipe != -1) {
         close(fd_pipe);
         fd_pipe = -1;
     }
     unlink(config->pipe_nombre);
- 
-    for (int i = 0; i < MAX_AGENTES; ++i) {
-        if (agentes[i].activo) {
-            buffer_destruir(&agentes[i].buffer);
-            agentes[i].activo = 0;
-        }
-    }
 }
  
 int main(int argc, char **argv) {
@@ -557,7 +539,12 @@ int main(int argc, char **argv) {
     // 1. Argumentos
     if (leer_configuracion(argc, argv, &config) != 0) {
         fprintf(stderr, "Error: configuracion invalida\n");
-        mostrar_uso(argv[0]);
+        //Muestra la forma correcta de invocar el servidor
+        fprintf(stderr, "Uso: %s -b <tamB> -p <PipeN> -t <time> -a <hilos>\n", argv[0]);
+        fprintf(stderr, "  -b  capacidad del buffer de cada agente (registros)\n");
+        fprintf(stderr, "  -p  nombre del FIFO nominal (recomendado: TORVALDS)\n");
+        fprintf(stderr, "  -t  tiempo de ejecucion, entre 30 y 120 segundos\n");
+        fprintf(stderr, "  -a  cantidad maxima de agentes, entre 1 y 4\n");
         return EXIT_FAILURE;
     }
  
@@ -591,12 +578,12 @@ int main(int argc, char **argv) {
     // 3. Hilo de tiempo y hilo de lectura (cada actividad en un hilo POSIX)
     if (pthread_create(&reloj, NULL, hilo_reloj, &config) != 0) {
         perror("No se pudo crear el hilo de tiempo");
-        limpiar_recursos(&config);
+        finalizar_servidor(&config);
         return EXIT_FAILURE;
     }
     if (pthread_create(&recolector, NULL, hilo_recolector, &config) != 0) {
         perror("No se pudo crear el hilo recolector");
-        limpiar_recursos(&config);      // al salir de main termina el hilo reloj
+        finalizar_servidor(&config);      // al salir de main termina el hilo reloj
         return EXIT_FAILURE;
     }
  
@@ -606,8 +593,6 @@ int main(int argc, char **argv) {
     printf("\nTiempo de ejecucion finalizado.\n");
  
     // 5. Cerrar los hilos de los agentes, resumen general y limpieza
-    esperar_agentes();
-    imprimir_resumen();
-    limpiar_recursos(&config);
+    finalizar_servidor(&config);
     return EXIT_SUCCESS;
 }
