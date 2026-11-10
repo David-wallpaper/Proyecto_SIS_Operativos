@@ -1,7 +1,5 @@
 # Proyecto ISE — Indicador de Sentimiento Económico
 
-Proyecto desarrollado para la asignatura **Sistemas Operativos** de la Pontificia Universidad Javeriana.
-
 El objetivo del proyecto es implementar un simulador del **Indicador de Sentimiento Económico (ISE)** utilizando programación en C sobre Linux y aplicando conceptos de sistemas operativos como procesos, hilos POSIX, pipes nominales, sincronización y manejo de recursos.
 
 ---
