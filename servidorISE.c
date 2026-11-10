@@ -445,7 +445,7 @@ static int se_acabo_el_tiempo(void) {
 static void *hilo_recolector(void *argumento) {
     const Configuracion *config = argumento;
  
-    while (se_acabo_el_tiempo()) {
+    while (!se_acabo_el_tiempo()) {
         struct pollfd descriptor = {fd_pipe, POLLIN, 0};
         MensajeAgente mensaje;
  
@@ -594,5 +594,6 @@ int main(int argc, char **argv) {
  
     // 5. Cerrar los hilos de los agentes, resumen general y limpieza
     finalizar_servidor(&config);
+    imprimir_resumen();
     return EXIT_SUCCESS;
 }
