@@ -159,7 +159,7 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
 
-            if (i + 1 >= argc || strcmp(argv[i + 1], "-n") == 0 || strcmp(argv[i + 1], "-p") == 0) {
+            if (i + 1 >= argc || strcmp(argv[i + 1], "-n") == 0 || strcmp(argv[i + 1], "-p") == 0) { // Comprueba que después de -n realmente exista
 
                 printf("Error: falta el archivo despues de -n\n");
                 return 1;
@@ -167,6 +167,7 @@ int main(int argc, char *argv[]) {
 
             nombreArchivo = argv[i + 1];
 
+            // Se aumenta i porque argv[i + 1] ya fue procesado
             i++;
         }
 
@@ -179,7 +180,7 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
 
-            if (i + 1 >= argc || strcmp(argv[i + 1], "-n") == 0 || strcmp(argv[i + 1], "-p") == 0) {
+            if (i + 1 >= argc || strcmp(argv[i + 1], "-n") == 0 || strcmp(argv[i + 1], "-p") == 0) { // Comprueba que después de -p exista un argumento válido
 
                 printf("Error: falta el nombre del pipe despues de -p\n");
                 return 1;
@@ -231,13 +232,7 @@ int main(int argc, char *argv[]) {
 
     totalEncuestas = contarEncuestas(archivo); //cuenta la cantidad de encuestas en el archivo
 
-    if (totalEncuestas < 0) {
-
-        fclose(archivo);
-        return 1;
-    }
-
-    if (totalEncuestas <= 0) {
+    if (totalEncuestas <= 0) { //no hay encuestas en el archivo
 
         printf("El archivo CSV no contiene encuestas.\n");
         fclose(archivo);
@@ -272,19 +267,21 @@ int main(int argc, char *argv[]) {
 
     printf("Conectado.\n\n");
 
-    memset(&mensaje, 0, sizeof(MensajeAgente));
+    memset(&mensaje, 0, sizeof(MensajeAgente)); //inicializa la estructura mensaje con ceros
 
     mensaje.tipo = MENSAJE_INICIO;
 
     mensaje.totalEncuestas = totalEncuestas;
 
-    fgets(linea, sizeof(linea), archivo);
-    convertirLineaEncuesta(linea, &encuesta);
+    fgets(linea, sizeof(linea), archivo); //lee la primera linea  en el archivo CSV y la pasa a encuesta
+    convertirLineaEncuesta(linea, &encuesta); //la pasa a la estructura encuesta
+
     rewind(archivo); //volver a ubicar el puntero al inicio del archivo
     fgets(linea, sizeof(linea), archivo);//volver a leer la cabecera
 
-    strcpy(mensaje.pais, encuesta.pais);
+    strcpy(mensaje.pais, encuesta.pais);//copia el pais de la encuesta a la estructura mensaje
 
+     //envia el mensaje al servidor
     if (enviarMensaje(fdPipe, &mensaje) == -1) {
 
         close(fdPipe);
@@ -360,9 +357,10 @@ int main(int argc, char *argv[]) {
     memset(&mensaje, 0, sizeof(MensajeAgente));
 
     mensaje.tipo = MENSAJE_FIN;
-    strcpy(mensaje.pais, encuesta.pais);
-    mensaje.totalEncuestas = encuestasEnviadas;
+    strcpy(mensaje.pais, encuesta.pais); //copia el pais de la encuesta a la estructura mensaje
+    mensaje.totalEncuestas = encuestasEnviadas; //actualiza el total de encuestas enviadas
 
+     //envia el mensaje al servidor
     if (enviarMensaje(fdPipe, &mensaje) == -1) {
 
         close(fdPipe);
