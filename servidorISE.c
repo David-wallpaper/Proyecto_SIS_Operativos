@@ -114,21 +114,23 @@ static int convertir_entero(const char *texto, int *resultado) {
  
 // Lee las banderas -b -p -t -a (en cualquier orden) y valida sus valores
 static int leer_configuracion(int argc, char **argv, Configuracion *config) {
+    // Marcan si cada bandera ya aparecio (para rechazar repetidas y detectar faltantes)
     int vistos_b = 0;
     int vistos_p = 0;
     int vistos_t = 0;
     int vistos_a = 0;
     int valor;
  
-    memset(config, 0, sizeof(*config));
+    memset(config, 0, sizeof(*config));     // deja toda la configuracion en cero
     strncpy(config->pipe_nombre, PIPE_NOMBRE_POR_DEFECTO, sizeof(config->pipe_nombre) - 1);
  
+    // Recorre los argumentos: cada bandera va seguida de su valor (argv[++i])
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-b") == 0) {
             if (vistos_b || i + 1 >= argc || convertir_entero(argv[++i], &valor) != 0) {
                 return -1;
             }
-            if (valor <= 0) {
+            if (valor <= 0) {               // el buffer necesita al menos 1 espacio
                 return -1;
             }
             config->tam_buffer = (size_t)valor;
@@ -150,20 +152,23 @@ static int leer_configuracion(int argc, char **argv, Configuracion *config) {
             }
             vistos_a = 1;
         } else {
-            return -1;
+            return -1;                      // bandera desconocida
         }
     }
  
+    // Las cuatro banderas son obligatorias
     if (!vistos_b || !vistos_p || !vistos_t || !vistos_a) {
         fprintf(stderr, "Error: debes indicar -b, -p, -t y -a\n");
         return -1;
     }
  
+    // Evita nombres vacios o que parezcan otra bandera (ej. "-p -t")
     if (config->pipe_nombre[0] == '\0' || config->pipe_nombre[0] == '-') {
         fprintf(stderr, "Error: nombre del FIFO invalido\n");
         return -1;
     }
  
+    // Limites del enunciado
     if (config->segundos < 30 || config->segundos > 120) {
         fprintf(stderr, "Error: el tiempo debe estar entre 30 y 120\n");
         return -1;
@@ -223,25 +228,25 @@ static void buffer_destruir(BufferAgente *buffer) {
 
 // espera un espacio libre, guarda el mensaje y avisa que hay un mensaje nuevo
 static void buffer_insertar(BufferAgente *buffer, const MensajeAgente *mensaje) {
-    sem_wait(&buffer->libres);                       // buffer lleno -> espera
+    sem_wait(&buffer->libres);                       // resta un espacio libre, si no hay, espera
  
-    pthread_mutex_lock(&buffer->mutex);              // seccion critica
+    pthread_mutex_lock(&buffer->mutex);              //solo este hilo toca el buffer
     buffer->elementos[buffer->entrada] = *mensaje;
-    buffer->entrada = (buffer->entrada + 1) % buffer->capacidad;
+    buffer->entrada = (buffer->entrada + 1) % buffer->capacidad;    // avanza, despues de la ultima vuelve a 0
     pthread_mutex_unlock(&buffer->mutex);
-    sem_post(&buffer->ocupados);                     // hay un mensaje nuevo
+    sem_post(&buffer->ocupados);                     // suma un mensaje, despierta al hilo del agente si esperaba
 }
  
 // Lo usa el hilo del agente: espera un mensaje, lo saca y avisa que hay un
 // espacio libre
 static void buffer_extraer(BufferAgente *buffer, MensajeAgente *mensaje) {
-    sem_wait(&buffer->ocupados);                     // buffer vacio -> espera
+    sem_wait(&buffer->ocupados);                     // resta un mensaje, si no hay, espera
  
-    pthread_mutex_lock(&buffer->mutex);              // seccion critica
+    pthread_mutex_lock(&buffer->mutex);              //solo este hilo toca el buffer
     *mensaje = buffer->elementos[buffer->salida];
-    buffer->salida = (buffer->salida + 1) % buffer->capacidad;
+    buffer->salida = (buffer->salida + 1) % buffer->capacidad;      // avanza, despues de la ultima vuelve a 0
     pthread_mutex_unlock(&buffer->mutex);
-    sem_post(&buffer->libres);                       // se libero un espacio
+    sem_post(&buffer->libres);                       // suma un espacio libre, despierta al recolector si esperaba
 }
 
 // ISE = media ponderada de los promedios de sentimiento de cada sector.
@@ -359,11 +364,11 @@ static void imprimir_resumen(void) {
 // Hilo de cada agente: saca mensajes de su buffer, acumula por sector y al
 // recibir FIN emite el reporte parcial y termina
 static void *hilo_agente(void *argumento) {
-    Agente *agente = argumento;
+    Agente *agente = argumento;         // el agente que le toca a este hilo
     MensajeAgente mensaje;
  
     while (1) {
-        buffer_extraer(&agente->buffer, &mensaje);
+        buffer_extraer(&agente->buffer, &mensaje);      // espera hasta que haya un mensaje
         if (mensaje.tipo == MENSAJE_FIN) {
             // El FIN real trae el PID del agente; el que pone el servidor al
             // acabarse el tiempo (esperar_agentes) trae PID 0
@@ -372,7 +377,7 @@ static void *hilo_agente(void *argumento) {
                 agente->total_reportado = mensaje.totalEncuestas;
             }
             imprimir_parcial(agente);
-            return NULL;
+            return NULL;                                // el hilo termina
         }
  
         if (mensaje.tipo == MENSAJE_ENCUESTA) {
@@ -380,6 +385,7 @@ static void *hilo_agente(void *argumento) {
             if (s < 0 || s >= NUM_SECTORES) {
                 continue;                       // sector invalido: se descarta
             }
+            // Suma la encuesta a los totales de su sector
             agente->cantidad++;
             agente->cantidad_sector[s]++;
             agente->suma_sector[s] += mensaje.encuesta.sentimiento;
@@ -404,13 +410,14 @@ static Agente *registrar_agente(const MensajeAgente *mensaje, const Configuracio
     Agente *agente = NULL;
  
     for (int i = 0; i < config->cantidad_agentes; ++i) {
-        if (!agentes[i].activo) {
+        if (!agentes[i].activo) {                       // primer lugar libre
             agente = &agentes[i];
             memset(agente, 0, sizeof(*agente));
             agente->activo = 1;
             agente->pid = mensaje->pid;
             snprintf(agente->pais, sizeof(agente->pais), "%s", mensaje->pais);
             agente->total_esperado = mensaje->totalEncuestas;   // lo anuncia el INICIO
+            // Si no se puede crear el buffer o el hilo, se deja el lugar libre otra vez
             if (buffer_inicializar(&agente->buffer, config->tam_buffer) != 0 || pthread_create(&agente->hilo, NULL, hilo_agente, agente) != 0) {
                 buffer_destruir(&agente->buffer);
                 memset(agente, 0, sizeof(*agente));
@@ -421,7 +428,6 @@ static Agente *registrar_agente(const MensajeAgente *mensaje, const Configuracio
     }
     return agente;
 }
- 
 // Hilo de tiempo: duerme <time> segundos y avisa que se acabo el tiempo
 static void *hilo_reloj(void *argumento) {
     const Configuracion *config = argumento;
@@ -446,7 +452,7 @@ static void *hilo_recolector(void *argumento) {
     const Configuracion *config = argumento;
  
     while (!se_acabo_el_tiempo()) {
-        struct pollfd descriptor = {fd_pipe, POLLIN, 0};
+        struct pollfd descriptor = {fd_pipe, POLLIN, 0};   // espera a que llegue un mensaje o se acabe el tiempo
         MensajeAgente mensaje;
  
         // espera datos maximo 500 ms para revisar si ya se acabo el tiempo
@@ -457,11 +463,12 @@ static void *hilo_recolector(void *argumento) {
             break;
         }
         if (resultado == 0 || !(descriptor.revents & POLLIN)) {
-            continue;
+            continue;                               // no llego nada en 500 ms
         }
  
-        // cada mensaje mide sizeof(MensajeAgente) (< PIPE_BUF), por lo que
-        // las escrituras de los agentes son atomicas y no se mezclan
+        // cada mensaje mide sizeof(MensajeAgente), por lo que
+        // las escrituras de los agentes son atomicas y no se mezclan:
+        // aunque escriban varios agentes a la vez, cada mensaje llega entero
         ssize_t leidos = read(fd_pipe, &mensaje, sizeof(mensaje));
         if (leidos == -1) {
             if (errno == EAGAIN) {                  // no habia datos todavia
@@ -477,7 +484,7 @@ static void *hilo_recolector(void *argumento) {
  
         Agente *agente = buscar_agente(mensaje.pid);
  
-        // Evento "conexion de un agente"
+        // Evento "conexion de un agente": llega un INICIO de un PID nuevo
         if (mensaje.tipo == MENSAJE_INICIO && agente == NULL) {
             agente = registrar_agente(&mensaje, config);
             pthread_mutex_lock(&mutex_salida);
@@ -497,8 +504,9 @@ static void *hilo_recolector(void *argumento) {
             continue;
         }
  
+        // Encuestas y FIN van al buffer del agente; su hilo los procesa
         if (mensaje.tipo == MENSAJE_ENCUESTA || mensaje.tipo == MENSAJE_FIN) {
-            buffer_insertar(&agente->buffer, &mensaje);
+            buffer_insertar(&agente->buffer, &mensaje);    // si el buffer esta lleno, aqui espera
             if (mensaje.tipo == MENSAJE_FIN) {
                 agente->fin_enviado = 1;
             }
