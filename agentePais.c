@@ -283,6 +283,8 @@ int main(int argc, char *argv[]) {
     fgets(linea, sizeof(linea), archivo);//volver a leer la cabecera
 
     strcpy(mensaje.pais, encuesta.pais);//copia el pais de la encuesta a la estructura mensaje
+    mensaje.pid = getpid(); //obtiene el pid del proceso actual
+
 
      //envia el mensaje al servidor
     if (enviarMensaje(fdPipe, &mensaje) == -1) {
