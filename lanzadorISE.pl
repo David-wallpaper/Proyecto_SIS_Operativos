@@ -12,8 +12,8 @@
 # (-b) y cantidad de agentes, y mide cuanto tardan los agentes en
 # enviar la carga de encuestas. Cada medicion se agrega al archivo
 #   Soluciones/ISE-Buffer-<tamB>-Agentes-<k>.dat
-# Al final crea Soluciones/resumen.csv (promedio, desviacion,
-# minimo y maximo) y Soluciones/integridad.csv.
+# Al final crea Soluciones/resumen.csv con el promedio, la desviacion
+# estandar, el minimo, el maximo y las encuestas por segundo.
 #
 # Uso (en la carpeta de los ejecutables):
 #   chmod +x lanzadorISE.pl
@@ -27,13 +27,13 @@ use Time::HiRes qw(time sleep);     # time() con decimales (microsegundos)
 my $Path = `pwd`;
 chomp($Path);
 
-my @Size_Buffer  = (1, 10, 100);   # valores de -b
-my @Num_Agentes  = (1, 2, 4);            # agentes enviando a la vez
-my $Repeticiones = 30;                       # mediciones por combinacion
-my $Tiempo       = 30;                      # -t del servidor (segundos)
-my $Resultados   = "Soluciones";            # carpeta de resultados
-my $Pipe         = "PIPE_LANZADOR";         # nombre del FIFO de prueba
-my $Carga        = "carga_FR.csv";          # archivo que envia cada agente
+my @Size_Buffer  = (1, 10, 100);    # valores de -b
+my @Num_Agentes  = (1, 2, 4);       # agentes enviando a la vez
+my $Repeticiones = 30;              # mediciones por combinacion
+my $Tiempo       = 30;              # -t del servidor (segundos)
+my $Resultados   = "Soluciones";    # carpeta de resultados
+my $Pipe         = "PIPE_LANZADOR"; # nombre del FIFO de prueba
+my $Carga        = "carga_FR.csv";  # archivo que envia cada agente
 
 my $Servidor  = "$Path/servidorISE";
 my $Agente    = "$Path/agentePais";
@@ -51,17 +51,15 @@ my $Encuestas = `wc -l < $Carga` - 1;
 printf("Carga de prueba: %d encuestas por agente\n", $Encuestas);
 
 mkdir("$Path/$Resultados") unless -d "$Path/$Resultados";
-open(my $integridad, '>', "$Path/$Resultados/integridad.csv") or die;
-print $integridad "tamB,agentes,esperadas,recibidas,agentes_completos\n";
 
-# Lanza un programa en segundo plano y devuelve su PID.
-# Su salida estandar y de error van al archivo indicado.
+# Lanza un programa en segundo plano, sin mostrar su salida,
+# y devuelve su PID
 sub lanzar {
-    my ($salida, @comando) = @_;
+    my @comando = @_;
     my $pid = fork();
     die "fork fallo\n" unless defined $pid;
     if ($pid == 0) {                                # proceso hijo
-        open(STDOUT, '>', $salida);
+        open(STDOUT, '>', "/dev/null");
         open(STDERR, '>&', \*STDOUT);
         exec(@comando) or exit(127);
     }
@@ -87,7 +85,7 @@ foreach my $tamB (@Size_Buffer) {
 
             # 1. Arranca el servidor
             unlink($Pipe);
-            my $spid = lanzar("log_servidor.txt", $Servidor, "-b", $tamB, "-p", $Pipe, "-t", $Tiempo, "-a", 4);
+            my $spid = lanzar($Servidor, "-b", $tamB, "-p", $Pipe, "-t", $Tiempo, "-a", 4);
             sleep(1);
 
             # 2. Cada lote: lanza los agentes a la vez y mide hasta que terminan
@@ -95,7 +93,7 @@ foreach my $tamB (@Size_Buffer) {
                 my $inicio = time();
                 my @pids;
                 for (my $a = 0; $a < $agentes; $a++) {
-                    push(@pids, lanzar("/dev/null", $Agente, "-n", $Carga, "-p", $Pipe));
+                    push(@pids, lanzar($Agente, "-n", $Carga, "-p", $Pipe));
                 }
                 waitpid($_, 0) foreach @pids;
                 my $segundos = time() - $inicio;
@@ -103,23 +101,13 @@ foreach my $tamB (@Size_Buffer) {
                 printf("   tamB=%-5d agentes=%d repeticion %d: %.4f s\n", $tamB, $agentes, $hechas + $i + 1, $segundos);
             }
 
-            # 3. Espera a que el servidor termine y revisa la integridad
+            # 3. Espera a que el servidor termine antes de la siguiente ejecucion
             waitpid($spid, 0);
-            open(my $log, '<', "log_servidor.txt") or die;
-            my ($recibidas, $completos) = (0, 0);
-            while (my $linea = <$log>) {
-                $recibidas = $1 if $linea =~ /Total de encuestas: (\d+)/;
-                $completos++ if $linea =~ /Verificacion FIN.*COMPLETO$/;
-            }
-            close($log);
-            printf $integridad ("%d,%d,%d,%d,%d\n", $tamB, $agentes, $lotes * $agentes * $Encuestas, $recibidas, $completos);
-
             $hechas += $lotes;
         }
         close($dat);
     }
 }
-close($integridad);
 
 # Resumen: promedio, desviacion estandar, minimo y maximo de cada .dat
 open(my $resumen, '>', "$Path/$Resultados/resumen.csv") or die;
@@ -143,9 +131,7 @@ foreach my $tamB (@Size_Buffer) {
 }
 close($resumen);
 
-unlink($Pipe, "log_servidor.txt", $Carga);
+unlink($Pipe, $Carga);
 printf("Fin: %s", scalar(localtime) . "\n");
 print "\n===== $Resultados/resumen.csv =====\n";
 system("cat $Path/$Resultados/resumen.csv");
-print "\n===== $Resultados/integridad.csv =====\n";
-system("cat $Path/$Resultados/integridad.csv");
