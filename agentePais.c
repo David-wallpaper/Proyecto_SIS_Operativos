@@ -31,6 +31,8 @@ typedef struct {
 typedef struct {
     TipoMensaje tipo;
 
+    pid_t pid;
+
     char pais[MAX_PAIS];
 
     int totalEncuestas;
@@ -272,6 +274,7 @@ int main(int argc, char *argv[]) {
     mensaje.tipo = MENSAJE_INICIO;
 
     mensaje.totalEncuestas = totalEncuestas;
+    mensaje.pid = getpid(); //obtiene el pid del proceso actual
 
     fgets(linea, sizeof(linea), archivo); //lee la primera linea  en el archivo CSV y la pasa a encuesta
     convertirLineaEncuesta(linea, &encuesta); //la pasa a la estructura encuesta
@@ -311,6 +314,7 @@ int main(int argc, char *argv[]) {
         memset(&mensaje, 0, sizeof(MensajeAgente));
 
         mensaje.tipo = MENSAJE_ENCUESTA;
+        mensaje.pid = getpid();
         mensaje.encuesta = encuesta;
 
 
@@ -359,6 +363,7 @@ int main(int argc, char *argv[]) {
     mensaje.tipo = MENSAJE_FIN;
     strcpy(mensaje.pais, encuesta.pais); //copia el pais de la encuesta a la estructura mensaje
     mensaje.totalEncuestas = encuestasEnviadas; //actualiza el total de encuestas enviadas
+    mensaje.pid = getpid();
 
      //envia el mensaje al servidor
     if (enviarMensaje(fdPipe, &mensaje) == -1) {

@@ -1,3 +1,19 @@
+/*
+ * Archivo: generadorCSV.c
+ * Proyecto: Indicador de Sentimiento Economico (ISE)
+ *
+ * Descripcion:
+ * Genera encuestas simuladas para un pais y las guarda en un archivo CSV.
+ * La cantidad de encuestas por sector depende del porcentaje solicitado.
+ *
+ * Uso:
+ * ./generadorCSV -p ES -e 100
+ *
+ * -p: pais seleccionado (ES, FR o IT).
+ * -e: porcentaje de encuestas que se generaran, entre 0 y 100.
+ * Las banderas pueden aparecer en cualquier orden.
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -8,10 +24,12 @@
 int main(int argc, char *argv[]) {
     char *pais = NULL;
     char *porcentajeTexto = NULL;
-    char * fin;
+    char *fin;
     double porcentaje;
+
     printf("Generador de encuestas\n");
 
+    // Lee las banderas y verifica que tengan valor y no esten repetidas.
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-p") == 0) {
             if (pais != NULL) {
@@ -53,6 +71,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // Comprueba los argumentos obligatorios y los paises permitidos.
     if (pais == NULL) {
         printf("Error: debes indicar el pais con -p\n");
         return 1;
@@ -70,108 +89,117 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-   errno = 0;
-   porcentaje = strtod(porcentajeTexto, &fin);
+    // Convierte el porcentaje a numero y detecta errores de conversion.
+    errno = 0;
+    porcentaje = strtod(porcentajeTexto, &fin);
 
-if (fin == porcentajeTexto || *fin != '\0' ||
-    errno == ERANGE || !isfinite(porcentaje)) {
-    printf("Error: el porcentaje debe ser un numero valido\n");
-    return 1;
-}
+    if (fin == porcentajeTexto || *fin != '\0' ||
+        errno == ERANGE || !isfinite(porcentaje)) {
+        printf("Error: el porcentaje debe ser un numero valido\n");
+        return 1;
+    }
 
-if (porcentaje < 0 || porcentaje > 100) {
-    printf("Error: el porcentaje debe estar entre 0 y 100\n");
-    return 1;
-}
+    if (porcentaje < 0 || porcentaje > 100) {
+        printf("Error: el porcentaje debe estar entre 0 y 100\n");
+        return 1;
+    }
+
     printf("Pais seleccionado: %s\n", pais);
     printf("Porcentaje seleccionado: %.2f%%\n", porcentaje);
 
-const char *sectores[5] = {
-    "Industria", "Servicios", "Consumidores", "Comercio", "Construccion"
-};
+    const char *sectores[5] = {
+        "Industria", "Servicios", "Consumidores", "Comercio", "Construccion"
+    };
 
-int maximos[3][5] = {
-    { 1760, 1430, 2020,1080,290}, // ES
-    { 3850, 4240, 1670, 2860, 24020 }, // FR
-    { 5440, 3100, 2000, 1560, 1000 }  // IT
+    // Cada fila corresponde a un pais y cada columna a un sector.
+    int maximos[3][5] = {
+        {1760, 1430, 2020, 1080, 290},   // ES
+        {3850, 4240, 1670, 2860, 24020}, // FR
+        {5440, 3100, 2000, 1560, 1000}   // IT
+    };
 
-};
+    int indicePais;
 
-int indicePais;
-
-if(strcmp(pais, "ES") == 0) {
-    indicePais = 0;
-} else if(strcmp(pais, "FR") == 0) {
-    indicePais = 1;
-} else {
-    indicePais = 2;
- }
-
-int cantidades[5];
-int total=0;
-
-
-for(int i=0; i<5; i++) {
-    cantidades[i] = (int)(maximos[indicePais][i] * porcentaje / 100.0 + 0.5);
-
-    total+= cantidades[i];
-
-    printf("%s: %d/%d encuestas\n",
-    sectores[i], cantidades[i], maximos[indicePais][i]);        
-}
-
-printf("Total de encuestas: %d\n", total);
-
-
-char nombreArchivo[100];
-
-snprintf(nombreArchivo, sizeof(nombreArchivo),
- "encuestas_%s.csv", pais);
-
-FILE *archivo = fopen(nombreArchivo, "w");
-
-if (archivo == NULL) {
-    perror("Error: no se pudo crear el archivo\n");
-    return 1;
-}
-
-if(fprintf(archivo, "ID_Encuesta,ID_Pais,Pais,Sector,ID_Sector,Sentimiento\n") < 0) {
-    perror("Error al escribir la cabecera");
-    fclose(archivo);
-    return 1;
-}
-
-srand((unsigned int)time(NULL));
-
-int idEncuesta = 1;
-
-for (int i = 0; i < 5; ++i) {
-    for (int j = 0; j < cantidades[i]; ++j) {
-        double sentimiento = (rand() % 10001) / 100.0;
-
-        if (fprintf(archivo, "%d,%d,%s,%s,%d,%.2f\n",
-                    idEncuesta,
-                    indicePais,
-                    pais,
-                    sectores[i],
-                    i,
-                    sentimiento) < 0) {
-            perror("Error al escribir una encuesta");
-            fclose(archivo);
-            return 1;
-        }
-
-        ++idEncuesta;
+    if (strcmp(pais, "ES") == 0) {
+        indicePais = 0;
+    } else if (strcmp(pais, "FR") == 0) {
+        indicePais = 1;
+    } else {
+        indicePais = 2;
     }
-}
 
-if(fclose(archivo) != 0) {
-    perror("Error al cerrar el archivo");
-    return 1;
-}
+    int cantidades[5];
+    int total = 0;
 
-printf("Archivo %s creado exitosamente\n", nombreArchivo);
+    // Aplica el porcentaje y redondea la cantidad de cada sector.
+    for (int i = 0; i < 5; i++) {
+        cantidades[i] =
+            (int)(maximos[indicePais][i] * porcentaje / 100.0 + 0.5);
+
+        total += cantidades[i];
+
+        printf("%s: %d/%d encuestas\n",
+               sectores[i], cantidades[i], maximos[indicePais][i]);
+    }
+
+    printf("Total de encuestas: %d\n", total);
+
+    // Construye el nombre del CSV y lo abre, reemplazandolo si ya existe.
+    char nombreArchivo[100];
+
+    snprintf(nombreArchivo, sizeof(nombreArchivo),
+             "encuestas_%s.csv", pais);
+
+    FILE *archivo = fopen(nombreArchivo, "w");
+
+    if (archivo == NULL) {
+        perror("Error: no se pudo crear el archivo\n");
+        return 1;
+    }
+
+    // Escribe la cabecera del archivo.
+    if (fprintf(archivo,
+                "ID_Encuesta,ID_Pais,Pais,Sector,ID_Sector,Sentimiento\n") < 0) {
+        perror("Error al escribir la cabecera");
+        fclose(archivo);
+        return 1;
+    }
+
+    // Inicializa la semilla para generar los sentimientos pseudoaleatorios.
+    srand((unsigned int)time(NULL));
+
+    int idEncuesta = 1;
+
+    // Genera y escribe las encuestas de cada sector.
+    for (int i = 0; i < 5; ++i) {
+        for (int j = 0; j < cantidades[i]; ++j) {
+
+            // Sentimiento entre 0.00 y 100.00.
+            double sentimiento = (rand() % 10001) / 100.0;
+
+            if (fprintf(archivo, "%d,%d,%s,%s,%d,%.2f\n",
+                        idEncuesta,
+                        indicePais,
+                        pais,
+                        sectores[i],
+                        i,
+                        sentimiento) < 0) {
+                perror("Error al escribir una encuesta");
+                fclose(archivo);
+                return 1;
+            }
+
+            ++idEncuesta;
+        }
+    }
+
+    // Cierra el archivo y verifica que se complete la escritura.
+    if (fclose(archivo) != 0) {
+        perror("Error al cerrar el archivo");
+        return 1;
+    }
+
+    printf("Archivo %s creado exitosamente\n", nombreArchivo);
 
     return 0;
 }
-
